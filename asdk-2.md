@@ -71,11 +71,21 @@ stack，再和imageNode组合成一个横向的stack，最后加上边缘inset�
 
 事实上，与css类似，绝大多数的布局都可以通过stack和inset的组合来完成；而和UIStackView不同的是，layout spec只是一个存在于内存之中的数据结构，并不需要额外创建view容器来承载子元素，大大节约了复杂布局带来的开销；同时因为它的轻量级和独立性，因此可以异步地计算，也可以缓存在node之中，对于大量tableViewCellNode快速布局有相当大的帮助。
 
-采用Automatic Layout的优势是明显的：
+Huy Nguyen也为ASLayoutSpec写了一个寓教于乐的[小游戏](http://nguyenhuy.github.io/froggy-asdk-layout/)，只是将上面提到的的针对css的小游戏版本改成了Objc，方便大家快速学习。
 
+###即刻的实践
+
+即刻在消息盒子页面大量使用了ASDK新的布局系统，从我们的实践经验来看有以下优缺点：
+
+####优点
+* 布局全部都不在主线程，并且有缓存，性能非常高。
 * 借用css成熟的flexbox，有大量现成资料和案例来学习，也继承了它大量的优点。
-* 由于ASDK是开源的，可以非常方便的调试。
+* 由于ASDK是开源的，调试难度大大降低。
 * 层次清晰，即使是复杂布局也相对易于维护。
 * 相似的布局规则容易复用。
 
-Huy Nguyen也为ASLayoutSpec写了一个寓教于乐的[小游戏](http://nguyenhuy.github.io/froggy-asdk-layout/)，只是将上面提到的的针对css的小游戏版本改成了Objc，方便大家快速学习。
+####缺点
+* 由于与iOS原生布局方式完全不同，学习适应需要时间
+* 对于ASDK依赖非常重，虽然布局方式相对通用，却无法独立于框架使用
+
+虽然我们没有在整个项目都采用新的的声明式布局方式，但是ASDK带来的启发是深远的：声明式、flexBox、缓存等等。我们也看到有一些其他布局库在声明式布局做许多的尝试，如[Brickkit](https://github.com/wayfair/brickkit-ios), [Layoutkit](https://github.com/linkedin/LayoutKit)等等，或许这就会是将来布局系统发展的趋势。
