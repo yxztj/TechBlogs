@@ -45,7 +45,7 @@ AsyncDisplayKit(ASDK)是2012年由Facebook开始着手开发，并于2014年出�
 Goodson。Scott(github:
 [appleguy](https://github.com/appleguy))曾经参与了多个iOS版本系统的开发，包括UIKit以及一些系统原生app，后来加入Facebook并参与了ASDK的开发并应用到Paper，因此该库有机会从相对底层的角度来进行一系列的优化。
 
-现在最新的版本是1.9.90（作为2.0的前序版本），除了拥有1.0系列版本核心的异步布局渲染功能，还增加了类似ComponentKit的基于flexbox的布局功能。
+现在最新的版本是1.9.90（作为2.0的前序版本），除了拥有1.0系列版本核心的异步布局渲染功能，还增加了类似ComponentKit的基于flexbox的布局功能。源文件有200多个，近3万行代码，是一个非常庞大而精密的显示和布局系统。
 
 在Scott介绍ASDK的视频中，总结了一下三点占用大量CPU时间的『元凶』（虽然仍然可能有以上提到的其他原因，但ASDK最主要集中于这三点进行优化）：
 
