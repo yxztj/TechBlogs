@@ -1,20 +1,20 @@
 # AsyncDisplayKit介绍（一）原理和思路
 
-UITableView/UICollectionView的优化一直是iOS应用性能优化重要的一块。即使是iOS10+iPhone7这样的最新软硬件配置，打开系统的信息app滚动，仍然能感到一定掉帧。对于app流畅度要求很高的苹果竟然在如此简单的tableView上无法达到60fps的帧率，可见优化滚动性能绝非一朝一夕之功。
+UITableView/UICollectionView的优化一直是iOS应用性能优化重要的一块。即使是iOS10+iPhone7这样的最新软硬件配置，在系统的信息app中滚动，仔细观察的话仍然能感到一定的掉帧现象。对于UI要求苛刻的苹果竟然在如此简单的tableView上无法达到60fps的帧率，可见优化滚动性能的背后并不简单。
 
 ### 为什么？
 
-理想状态下，iOS的帧率应该保持在60fps，然而很多情况下用户会感觉到掉帧或者操作『不跟手』。原因可能有很多，这里只简单列举几个，网上可以找到许多相应分析：
+理想状态下，iOS的帧率应该保持在60fps。然而很多情况下用户操作时会感觉到掉帧或者『不跟手』。原因可能有很多，这里只简单列举几个，网上可以找到许多相应分析：
 
 1.  **CPU(主要是主线程)/GPU负担过重或者不均衡**（诸如mask/cornerRadius/drawRect/opaque带来offscreen
 rendering/blending等等）。由于所有的UIView都是由CALayer来负责显示，因此对Core
 Animation的了解就变得尤为重要。这里推荐Nick Lockwood的*Core Animation: Advanced
 Techniques*一书，其中有对Core Animation的性能有着非常详尽的梳理和剖析。
 1.  **Autolayout布局性能瓶颈**，约束计算时间会随着数量呈指数级增长，并且必须在主线程执行。具体分析可以参考这篇文章：[http://floriankugler.com/2013/04/22/auto-layout-performance-on-ios/](http://floriankugler.com/2013/04/22/auto-layout-performance-on-ios/)。这也是为何ASDK抛弃了Autolayout而设计了自己的布局系统的重要原因之一([https://github.com/facebook/AsyncDisplayKit/issues/196](https://github.com/facebook/AsyncDisplayKit/issues/196))。Autolayout在单个View开发时能带来很多便利，而在一些需要高性能的场景下需要谨慎使用。
-1.  尽管从iPhone4S(A5)开始CPU已经采用多核，**然而对于大多数app来说，并行效率仍然非常低下。**也就是说，在app卡顿（主线程所占用的核心满负荷）时，往往CPU的其他核心几乎无事可做。一般情况下，由于主线程承担了绝大部分的工作，仅仅是把主线程的任务转移一部分给其他线程进行异步处理，就可以马上享受到并发带来的性能提升。这应该也是AsyncDisplayKit得名的原因之一。
+1.  尽管从iPhone4S(A5)开始CPU已经采用多核，**然而对于大多数app来说，多线程协作并没有被充分利用。**换句话说，在app卡顿（主线程所占用的核心满负荷）时，往往CPU的其他核心几乎无事可做。一般情况下，由于主线程承担了绝大部分的工作，如果能把主线程的任务转移一部给其他线程进行异步处理，就可以马上享受到并发带来的性能提升。这应该也是AsyncDisplayKit得名的原因之一。
 
 UIKit的单线程设计也有一定的历史原因。早在十年前iOS SDK刚问世的时候，mobile
-SDK还是一个非常新的概念，更没有多核CPU的存在，因此当时的重点是简单可靠，大多数API都没有支持相对复杂的异步操作。即使到现在，如果要完全丑姑娘够UIKit使之支持异步绘制和布局，对于兼容已有海量的app，难度可想而知。在iOS10中虽然对UICollectionView/UITableView做了一定的预加载优化（WWDC2016
+SDK还是一个非常新的概念，更没有移动多核CPU的存在，因此当时的重点是简单可靠，大多数API都没有支持相对复杂的异步操作。时至今日，如果要完全重构UIKit使之支持异步绘制和布局，对于兼容已有海量的app，难度可想而知。在iOS10中虽然对UICollectionView/UITableView做了一定的预加载优化（WWDC2016
 Session219），然而并没有从根本上解决主线程布局和渲染的问题。
 
 ### 优化思路
@@ -36,6 +36,7 @@ Session219），然而并没有从根本上解决主线程布局和渲染的问�
 [https://github.com/johnil/VVeboTableViewDemo](https://github.com/johnil/VVeboTableViewDemo)
 1.  弃用Autolayout，采用手动布局计算。这样虽然可以换来最高的性能，但是代价是编写和维护的不便，对于经常改动或者性能要求不高的场景并不一定值得。
 1.  自行异步渲染Layer，如：[https://github.com/ibireme/YYAsyncLayer](https://github.com/ibireme/YYAsyncLayer)
+2. iOS10列表的prefetch API，只是并没有解决Autolayout的性能，同时也受到系统版本限制。
 
 ### ASDK的基本思路：异步
 
@@ -45,7 +46,7 @@ AsyncDisplayKit(ASDK)是2012年由Facebook开始着手开发，并于2014年出�
 Goodson。Scott(github:
 [appleguy](https://github.com/appleguy))曾经参与了多个iOS版本系统的开发，包括UIKit以及一些系统原生app，后来加入Facebook并参与了ASDK的开发并应用到Paper，因此该库有机会从相对底层的角度来进行一系列的优化。
 
-现在最新的版本是1.9.90（作为2.0的前序版本），除了拥有1.0系列版本核心的异步布局渲染功能，还增加了类似ComponentKit的基于flexbox的布局功能。源文件有200多个，近3万行代码，是一个非常庞大而精密的显示和布局系统。
+现在最新的版本是2.0，除了拥有1.0系列版本核心的异步布局渲染功能，还增加了类似ComponentKit的基于flexbox的布局功能。源文件一共近300个，3万多行代码，是一个非常庞大而精密的显示和布局系统。使用上**如果不考虑工程成本，完全可以在一定程度上代替UIKit的大部分功能。**同时由于和Instagram同处于FB家族，因此也迅速在最近的更新中加入了IGListKit的支持。
 
 在Scott介绍ASDK的视频中，总结了一下三点占用大量CPU时间的『元凶』（虽然仍然可能有以上提到的其他原因，但ASDK最主要集中于这三点进行优化）：
 
@@ -57,9 +58,11 @@ Goodson。Scott(github:
 
 ![](http://oekkej3m0.bkt.clouddn.com/1-J1EFn4zt43SmIt7Jm89jBQ.png)
 
-我们知道对于一般UIView和CALayer来说，因为不是线程安全的，任何相关操作都需要在主线程进行。正如UIView可以弥补CALayer无法处理用户事件的不足一样，ASDK引入了Node的概念来解决UIView/CALayer只能在主线程上操作的限制。主要特点如下：
+我们知道对于一般UIView和CALayer来说，因为不是线程安全的，任何相关操作都需要在主线程进行。正如UIView可以弥补CALayer无法处理用户事件的不足一样，ASDK引入了Node的概念来解决UIView/CALayer只能在主线程上操作的限制（不由让人想起『Abstract layer can solve many problems, except problem of having too many abstract layers.』）。
 
-1.  每个Node一一对应相应的UIView或者CALayer，从开发者的角度而言，只需要将初始化UIView的代码稍作修改，替换为创建ASDisplayNode即可。在不需要接受用户操作的Node上可以开启isLayerBacked，直接使用CALayer进一步降低开销。根据Scott的研究UIView的开销大约是CALayer的5倍。
+主要特点如下：
+
+1.  每个Node对应相应的UIView或者CALayer，从开发者的角度而言，只需要将初始化UIView的代码稍作修改，替换为创建ASDisplayNode即可。在不需要接受用户操作的Node上可以开启isLayerBacked，直接使用CALayer进一步降低开销。根据Scott的研究UIView的开销大约是CALayer的5倍。
 1.  Node默认是异步布局/渲染，只有在需要将frame/contents等同步到UIView上才会回到主线程，使其空出更多的时间处理其他事件。
 1.  ASDK只有在认为需要的时候才会异步地为Node加载相应的View，因此创建Node的开销变得非常低。同时Node是线程安全的，可以在任意queue上创建和设置属性。
 1.  ASDK不仅有与UIView对应的大部分控件（如ASButtonNode、ASTextNode、ASImageNode、ASTableNode等等），同时也bridge了大多数UIView的方法和属性，可以非常方便的操作frame/backgroundColor/addSubnode等，因此一般情况下只要对Node进行操作，ASDK就会在适当的时候同步到其View。如果需要的话，当相应的View加载之后（或访问node.view手动触发加载），也可以通过node.view的方式直接访问，回到我们熟悉的UIKit。
@@ -79,9 +82,9 @@ Goodson。Scott(github:
     _imageNode.frame = CGRectMake(10.0f, 10.0f, 40.0f, 40.0f);
     [self.view addSubview:_imageNode.view];
 
-虽然只是简单的把View替换成了Node，然而和UIImageView不同的是，此时ASDK已经在悄悄使用另一个线程进行图片解码，从而大大降低新的用户操作到来时主线程被阻塞的概率，使之能得到及时的处理。
+虽然只是简单的把View替换成了Node，然而和UIImageView不同的是，此时ASDK已经在悄悄使用另一个线程进行图片解码，从而大大降低新的用户操作到来时主线程被阻塞的概率，使每一个回调都能得到及时的处理。实践中将会有更加复杂的情况，有兴趣的话可以参考项目中的Example目录，有20多个不同场景下的示例项目。
 
-### 其他细节
+### 一些细节
 
 1.  在ASDisplayNode.h中有相当多的注释，其中displaysAsynchronously属性大致描述了异步渲染的步骤：
 
@@ -162,11 +165,11 @@ cycle导致memory leak。
 
 ### Best Practice
 
-由于ASDK的基本理念是在需要创建UIView时替换成对应的Node来获取性能优势，因此对于现有代码改动较大，侵入性较高，同时由于大量原本熟悉的操作变成了异步的，对于一个团队来说学习曲线也较为陡峭。
+由于ASDK的基本理念是在需要创建UIView时替换成对应的Node来获取性能提升，因此对于现有代码改动较大，侵入性较高，同时由于大量原本熟悉的操作变成了异步的，对于一个团队来说学习曲线也较为陡峭。
 
 从我们在实际项目中的经验，结合Scott的建议来看，不需要也不可能将所有UIView都替换成其Node版本。将注意力集中在可能造成主线程阻塞的地方，如tableView/collectionView、复杂布局的View、使用连续手势的操作等等。找到合适的切入点将一部分性能需求较高的代码替换成ASDK，会是一个较好的选择。
 
-对于优化以后的效果，可以尝试我们的应用：[即刻](http://jike.ruguoapp.com/)，其中消息盒子部分应用了ASDK进行了大量调优工作，从而在拥有大量图片和gif/不定长度文字共存的情况下，仍然能达到60fps的流畅体验。
+对于优化以后的效果，可以尝试我们的应用：[即刻](http://jike.ruguoapp.com/)，其中消息盒子部分应用了ASDK进行了大量调优工作，从而在拥有大量图片和gif/不定长度文字共存的情况下，仍然能达到60fps的流畅体验。在我们将近两年的实践中，尽管也碰到过一些坑，但是带来的提升也是非常明显的，使在构建更复杂的界面同时保持高性能成为可能。
 
 ### 推荐阅读
 
